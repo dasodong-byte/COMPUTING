@@ -74,7 +74,7 @@ async function seedUsers(roleByName: Record<string, string>) {
   for (const d of demo) {
     const user = await prisma.user.upsert({
       where: { email: d.email },
-      update: {},
+      update: { passwordHash, firstName: d.firstName, lastName: d.lastName },
       create: {
         email: d.email,
         passwordHash,

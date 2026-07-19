@@ -2,12 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { jsonError, requireUser, route } from "@/lib/api";
-import {
-  DEFAULT_CURRENCY,
-  computeShipping,
-  invoiceNumber,
-  orderReference,
-} from "@/lib/commerce";
+import { invoiceNumber, orderReference } from "@/lib/commerce";
+import { getSettings } from "@/lib/settings";
+import { charge, isProviderId, PAYMENT_METHODS, type PaymentProviderId } from "@/lib/payments/providers";
 
 const schema = z.object({
   lines: z
@@ -23,7 +20,7 @@ const schema = z.object({
   phone: z.string().trim().min(1, "Téléphone requis").max(40),
   address: z.string().trim().min(1, "Adresse requise").max(240),
   city: z.string().trim().min(1, "Ville requise").max(120),
-  paymentMethod: z.string().trim().min(1).max(60),
+  provider: z.string().trim().min(1, "Moyen de paiement requis"),
 });
 
 export const POST = route(async (req: NextRequest) => {
@@ -35,19 +32,22 @@ export const POST = route(async (req: NextRequest) => {
   }
   const data = parsed.data;
 
+  if (!isProviderId(data.provider)) {
+    return jsonError("Moyen de paiement inconnu.", 400);
+  }
+  const settings = await getSettings();
+  const providerId = data.provider as PaymentProviderId;
+
   const slugs = data.lines.map((l) => l.slug);
   const products = await prisma.product.findMany({
     where: { slug: { in: slugs }, deletedAt: null, published: true },
   });
   const bySlug = new Map(products.map((p) => [p.slug, p]));
 
-  // Validate availability and recompute prices from the DB (never trust client).
   const items: { productId: string; name: string; unitPrice: number; quantity: number }[] = [];
   for (const line of data.lines) {
     const product = bySlug.get(line.slug);
-    if (!product) {
-      return jsonError(`Produit introuvable : ${line.slug}`, 400);
-    }
+    if (!product) return jsonError(`Produit introuvable : ${line.slug}`, 400);
     if (product.stock < line.qty) {
       return jsonError(`Stock insuffisant pour « ${product.name} » (disponible : ${product.stock}).`, 409);
     }
@@ -60,8 +60,9 @@ export const POST = route(async (req: NextRequest) => {
   }
 
   const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-  const shipping = computeShipping(subtotal);
-  const total = subtotal + shipping;
+  const shipping = subtotal >= settings.deliveryFreeThreshold ? 0 : settings.deliveryFlatFee;
+  const tax = Math.round(subtotal * (settings.taxRate / 100) * 100) / 100;
+  const total = subtotal + shipping + tax;
 
   const customer = await prisma.customer.upsert({
     where: { userId: user.id },
@@ -70,6 +71,11 @@ export const POST = route(async (req: NextRequest) => {
   });
 
   const reference = orderReference();
+  const chargeResult = await charge(
+    { providerId, amount: total, currency: settings.currency, reference },
+    settings
+  );
+  const paid = chargeResult.status === "PAID";
 
   const order = await prisma.$transaction(async (tx) => {
     const created = await tx.order.create({
@@ -77,17 +83,28 @@ export const POST = route(async (req: NextRequest) => {
         reference,
         userId: user.id,
         customerId: customer.id,
-        status: "PENDING",
+        status: paid ? "CONFIRMED" : "PENDING",
         subtotal,
         shipping,
+        tax,
         total,
-        currency: DEFAULT_CURRENCY,
+        currency: settings.currency,
         items: { create: items },
         invoice: {
-          create: { number: invoiceNumber(), amount: total, status: "PENDING" },
+          create: {
+            number: invoiceNumber(),
+            amount: total,
+            status: paid ? "PAID" : "PENDING",
+          },
         },
         payment: {
-          create: { method: data.paymentMethod, amount: total, status: "PENDING" },
+          create: {
+            method: PAYMENT_METHODS[providerId].label,
+            amount: total,
+            status: chargeResult.status,
+            reference: chargeResult.providerRef,
+            paidAt: paid ? new Date() : null,
+          },
         },
         delivery: {
           create: { address: data.address, city: data.city, status: "PENDING" },
@@ -95,7 +112,6 @@ export const POST = route(async (req: NextRequest) => {
       },
     });
 
-    // Decrement stock atomically.
     for (const item of items) {
       await tx.product.update({
         where: { id: item.productId },
@@ -107,10 +123,9 @@ export const POST = route(async (req: NextRequest) => {
       data: {
         userId: user.id,
         title: `Commande ${reference} reçue`,
-        body: "Votre commande est en attente de validation par notre équipe.",
+        body: chargeResult.message,
       },
     });
-
     await tx.auditLog.create({
       data: { userId: user.id, action: "order.create", entity: "Order", entityId: created.id },
     });
@@ -118,5 +133,10 @@ export const POST = route(async (req: NextRequest) => {
     return created;
   });
 
-  return NextResponse.json({ reference: order.reference, id: order.id });
+  return NextResponse.json({
+    reference: order.reference,
+    id: order.id,
+    paymentStatus: chargeResult.status,
+    message: chargeResult.message,
+  });
 });

@@ -3,9 +3,17 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
+import { QuoteClientActions } from "@/components/dashboard/QuoteClientActions";
+import { InvoiceDownload } from "@/components/dashboard/InvoiceDownload";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
-import { QUOTE_STATUS_LABELS, formatMoney, type QuoteStatusName } from "@/lib/commerce";
+import {
+  QUOTE_STATUS_LABELS,
+  EXEC_STATUS_LABELS,
+  PAYMENT_STATUS_LABELS,
+  formatMoney,
+  type QuoteStatusName,
+} from "@/lib/commerce";
 
 export const metadata: Metadata = { title: "Détail du devis" };
 export const dynamic = "force-dynamic";
@@ -56,6 +64,38 @@ export default async function ClientQuoteDetailPage({ params }: { params: { refe
               )}
             </div>
           )}
+
+          <div className="card p-6">
+            <h3 className="font-bold text-navy-800">Suivi du service</h3>
+            <dl className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-navy-600">Paiement</dt>
+                <dd><StatusBadge label={PAYMENT_STATUS_LABELS[quote.paymentStatus] ?? quote.paymentStatus} status={quote.paymentStatus} /></dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-navy-600">Exécution</dt>
+                <dd><StatusBadge label={EXEC_STATUS_LABELS[quote.execStatus] ?? quote.execStatus} status={quote.execStatus} /></dd>
+              </div>
+              {quote.invoiceNumber && (
+                <div className="flex justify-between">
+                  <dt className="text-navy-600">Facture</dt>
+                  <dd className="font-semibold text-navy-800">{quote.invoiceNumber}</dd>
+                </div>
+              )}
+            </dl>
+            {quote.paymentStatus === "PAID" && (
+              <div className="mt-4">
+                <InvoiceDownload href={`/espace-client/devis/${quote.reference}/facture`} />
+              </div>
+            )}
+          </div>
+
+          <QuoteClientActions
+            quoteId={quote.id}
+            status={quote.status}
+            paymentStatus={quote.paymentStatus}
+            amount={amount}
+          />
 
           <Link href="/espace-client/devis" className="btn-ghost">Retour à mes devis</Link>
         </div>

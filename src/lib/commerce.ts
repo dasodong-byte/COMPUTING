@@ -90,6 +90,21 @@ export const QUOTE_STATUS_LABELS: Record<QuoteStatusName, string> = {
   CLOSED: "Clôturé",
 };
 
+export const EXEC_STATUS_LABELS: Record<string, string> = {
+  PENDING: "En attente",
+  ASSIGNED: "Affecté",
+  IN_PROGRESS: "En cours",
+  DELIVERED: "Livré",
+  CLOSED: "Clôturé",
+};
+
+export const DELIVERY_STATUS_LABELS: Record<string, string> = {
+  PENDING: "En attente",
+  PROCESSING: "En préparation",
+  SHIPPED: "Expédiée",
+  DELIVERED: "Livrée",
+};
+
 export function statusBadgeClass(status: string): string {
   switch (status) {
     case "DELIVERED":

@@ -1,15 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, ArrowRight, LogIn, Loader2 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { formatPrice } from "@/lib/products";
-import { computeShipping } from "@/lib/commerce";
 import { PageHeader } from "@/components/layout/PageHeader";
 
-const PAYMENT_METHODS = ["Paiement à la livraison", "Mobile Money", "Virement bancaire"];
+type PaymentMethod = { id: string; label: string; kind: string; description: string };
+type PublicSettings = {
+  currency: string;
+  taxRate: number;
+  deliveryFlatFee: number;
+  deliveryFreeThreshold: number;
+  paymentMethods: PaymentMethod[];
+};
 
 export default function CommandePage() {
   const { lines, total, count, clear } = useCart();
@@ -17,7 +23,22 @@ export default function CommandePage() {
   const [reference, setReference] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const shipping = computeShipping(total);
+  const [settings, setSettings] = useState<PublicSettings | null>(null);
+
+  useEffect(() => {
+    fetch("/api/settings/public")
+      .then((r) => r.json())
+      .then(setSettings)
+      .catch(() => setSettings(null));
+  }, []);
+
+  const methods = settings?.paymentMethods ?? [];
+  const freeThreshold = settings?.deliveryFreeThreshold ?? 500;
+  const flatFee = settings?.deliveryFlatFee ?? 25;
+  const taxRate = settings?.taxRate ?? 0;
+  const shipping = total >= freeThreshold ? 0 : flatFee;
+  const tax = Math.round(total * (taxRate / 100) * 100) / 100;
+  const grandTotal = total + shipping + tax;
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -31,7 +52,7 @@ export default function CommandePage() {
       phone: String(form.get("phone") ?? ""),
       city: String(form.get("city") ?? ""),
       address: String(form.get("address") ?? ""),
-      paymentMethod: String(form.get("payment") ?? PAYMENT_METHODS[0]),
+      provider: String(form.get("provider") ?? ""),
     };
     try {
       const res = await fetch("/api/orders", {
@@ -122,16 +143,19 @@ export default function CommandePage() {
               <div className="card p-6">
                 <h2 className="text-lg font-bold text-navy-800">Mode de paiement</h2>
                 <div className="mt-4 space-y-2">
-                  {PAYMENT_METHODS.map((m, i) => (
-                    <label key={m} className="flex cursor-pointer items-center gap-3 rounded-lg border border-navy-100 p-3 text-sm text-navy-800 has-[:checked]:border-brand-blue has-[:checked]:bg-navy-50">
-                      <input type="radio" name="payment" value={m} defaultChecked={i === 0} className="h-4 w-4 accent-brand-blue" />
-                      {m}
+                  {methods.map((m, i) => (
+                    <label key={m.id} className="flex cursor-pointer items-start gap-3 rounded-lg border border-navy-100 p-3 text-sm text-navy-800 has-[:checked]:border-brand-blue has-[:checked]:bg-navy-50">
+                      <input type="radio" name="provider" value={m.id} defaultChecked={i === 0} className="mt-0.5 h-4 w-4 accent-brand-blue" />
+                      <span>
+                        <span className="font-medium">{m.label}</span>
+                        <span className="block text-xs text-navy-600">{m.description}</span>
+                      </span>
                     </label>
                   ))}
+                  {methods.length === 0 && (
+                    <p className="text-sm text-navy-600">Chargement des moyens de paiement…</p>
+                  )}
                 </div>
-                <p className="mt-3 text-xs text-navy-600">
-                  Le paiement est validé manuellement par notre équipe (paiement en ligne automatique à venir).
-                </p>
               </div>
             </div>
 
@@ -149,7 +173,8 @@ export default function CommandePage() {
                 <dl className="mt-4 space-y-2 border-t border-navy-100 pt-4 text-sm">
                   <div className="flex justify-between"><dt className="text-navy-600">Sous-total</dt><dd className="font-semibold">{formatPrice(total)}</dd></div>
                   <div className="flex justify-between"><dt className="text-navy-600">Livraison</dt><dd className="font-semibold">{shipping === 0 ? "Offerte" : formatPrice(shipping)}</dd></div>
-                  <div className="flex justify-between border-t border-navy-100 pt-2 text-base"><dt className="font-bold text-navy-800">Total</dt><dd className="font-extrabold text-navy-800">{formatPrice(total + shipping)}</dd></div>
+                  {tax > 0 && <div className="flex justify-between"><dt className="text-navy-600">TVA ({taxRate}%)</dt><dd className="font-semibold">{formatPrice(tax)}</dd></div>}
+                  <div className="flex justify-between border-t border-navy-100 pt-2 text-base"><dt className="font-bold text-navy-800">Total</dt><dd className="font-extrabold text-navy-800">{formatPrice(grandTotal)}</dd></div>
                 </dl>
                 {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-xs text-red-700">{error}</p>}
                 <button type="submit" disabled={submitting} className={`btn-primary mt-6 w-full ${submitting ? "opacity-70" : ""}`}>

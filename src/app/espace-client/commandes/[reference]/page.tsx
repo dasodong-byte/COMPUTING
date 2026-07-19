@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
+import { InvoiceDownload } from "@/components/dashboard/InvoiceDownload";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import {
@@ -49,6 +50,7 @@ export default async function ClientOrderDetailPage({ params }: { params: { refe
             <dl className="mt-4 space-y-2 border-t border-navy-100 pt-4 text-sm">
               <div className="flex justify-between"><dt className="text-navy-600">Sous-total</dt><dd>{formatMoney(Number(order.subtotal), order.currency)}</dd></div>
               <div className="flex justify-between"><dt className="text-navy-600">Livraison</dt><dd>{Number(order.shipping) === 0 ? "Offerte" : formatMoney(Number(order.shipping), order.currency)}</dd></div>
+              {Number(order.tax) > 0 && <div className="flex justify-between"><dt className="text-navy-600">TVA</dt><dd>{formatMoney(Number(order.tax), order.currency)}</dd></div>}
               <div className="flex justify-between border-t border-navy-100 pt-2 text-base font-bold text-navy-800"><dt>Total</dt><dd>{formatMoney(Number(order.total), order.currency)}</dd></div>
             </dl>
           </div>
@@ -76,6 +78,9 @@ export default async function ClientOrderDetailPage({ params }: { params: { refe
               <h3 className="font-bold text-navy-800">Facture</h3>
               <p className="mt-2 text-sm text-navy-600">N° {order.invoice.number}</p>
               <p className="text-sm text-navy-600">Montant : {formatMoney(Number(order.invoice.amount), order.currency)}</p>
+              <div className="mt-3">
+                <InvoiceDownload href={`/espace-client/commandes/${order.reference}/facture`} />
+              </div>
             </div>
           )}
           <Link href="/espace-client/commandes" className="btn-ghost w-full">Retour à mes commandes</Link>
