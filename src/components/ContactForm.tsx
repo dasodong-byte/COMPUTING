@@ -1,11 +1,37 @@
 "use client";
 
 import { useState } from "react";
-import { Send, CheckCircle2 } from "lucide-react";
+import { Send, CheckCircle2, Loader2 } from "lucide-react";
 import { SERVICES } from "@/lib/services";
 
 export function ContactForm() {
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    const payload = Object.fromEntries(new FormData(e.currentTarget).entries());
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Une erreur est survenue.");
+        setLoading(false);
+        return;
+      }
+      setSent(true);
+    } catch {
+      setError("Impossible d'envoyer la demande. Réessayez.");
+      setLoading(false);
+    }
+  }
 
   if (sent) {
     return (
@@ -15,7 +41,7 @@ export function ContactForm() {
         <p className="mt-1 text-sm text-navy-600">
           Merci, notre équipe vous recontactera sous 24h.
         </p>
-        <button onClick={() => setSent(false)} className="btn-ghost mt-6">
+        <button onClick={() => { setSent(false); setLoading(false); }} className="btn-ghost mt-6">
           Envoyer une autre demande
         </button>
       </div>
@@ -23,13 +49,7 @@ export function ContactForm() {
   }
 
   return (
-    <form
-      className="grid gap-4 sm:grid-cols-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        setSent(true);
-      }}
-    >
+    <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSubmit}>
       <Field label="Nom complet" name="name" required />
       <Field label="Email" name="email" type="email" required />
       <Field label="Téléphone" name="phone" type="tel" />
@@ -57,7 +77,9 @@ export function ContactForm() {
         />
       </div>
       <div className="sm:col-span-2">
-        <button type="submit" className="btn-primary w-full sm:w-auto">
+        {error && <p className="mb-3 rounded-lg bg-red-50 p-3 text-xs text-red-700">{error}</p>}
+        <button type="submit" disabled={loading} className={`btn-primary w-full sm:w-auto ${loading ? "opacity-70" : ""}`}>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Envoyer ma demande <Send className="h-4 w-4" />
         </button>
       </div>
