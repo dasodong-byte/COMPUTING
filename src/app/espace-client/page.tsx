@@ -43,23 +43,21 @@ export default async function EspaceClientPage() {
             <h3 className="mt-3 font-bold text-navy-800">Commander du matériel</h3>
             <p className="mt-1 text-sm text-navy-600">Parcourez le catalogue et passez commande en ligne.</p>
           </Link>
-          <Link href="/contact#devis" className="card group p-6 transition hover:border-brand-orange">
+          <Link href="/espace-client/devis/nouveau" className="card group p-6 transition hover:border-brand-orange">
             <FileText className="h-7 w-7 text-brand-orange" />
             <h3 className="mt-3 font-bold text-navy-800">Demander un devis</h3>
             <p className="mt-1 text-sm text-navy-600">Sollicitez un devis pour l&apos;un de nos services.</p>
           </Link>
-          <div className="card p-6">
+          <Link href="/espace-client/commandes" className="card group p-6 transition hover:border-brand-blue">
             <Bell className="h-7 w-7 text-brand-blue" />
-            <h3 className="mt-3 font-bold text-navy-800">Suivi de vos dossiers</h3>
-            <p className="mt-1 text-sm text-navy-600">
-              Le suivi détaillé des commandes et devis arrive dans la prochaine étape (Phase 2 — cœur commerce).
-            </p>
-          </div>
-          <div className="card p-6">
+            <h3 className="mt-3 font-bold text-navy-800">Suivi de vos commandes</h3>
+            <p className="mt-1 text-sm text-navy-600">Consultez le statut, les factures et la livraison de vos commandes.</p>
+          </Link>
+          <Link href="/espace-client/devis" className="card group p-6 transition hover:border-brand-orange">
             <Heart className="h-7 w-7 text-brand-orange" />
-            <h3 className="mt-3 font-bold text-navy-800">Vos favoris</h3>
-            <p className="mt-1 text-sm text-navy-600">Retrouvez ici les produits que vous suivez.</p>
-          </div>
+            <h3 className="mt-3 font-bold text-navy-800">Mes devis</h3>
+            <p className="mt-1 text-sm text-navy-600">Suivez vos demandes de devis et leurs montants proposés.</p>
+          </Link>
         </div>
       </DashboardShell>
     </>
