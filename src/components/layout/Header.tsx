@@ -20,6 +20,8 @@ import {
 import { MAIN_NAV } from "@/lib/nav";
 import { SITE } from "@/lib/site";
 import { useCart } from "@/context/CartContext";
+import { AccountMenu } from "@/components/layout/AccountMenu";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -102,6 +104,8 @@ export function Header() {
                 </span>
               )}
             </Link>
+            <NotificationBell />
+            <AccountMenu />
             <Link href="/contact#devis" className="btn-primary hidden md:inline-flex">
               Demander un devis <ArrowRight className="h-4 w-4" />
             </Link>
